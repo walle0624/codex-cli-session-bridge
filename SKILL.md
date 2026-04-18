@@ -106,19 +106,21 @@ Use a direct prompt such as:
 Do not invent the final session title without confirmation.
 
 When the user gives the new name, create a new Codex CLI session and register it locally like this:
-- start the new conversation
-- capture the returned `session id` directly from Codex CLI output
-- immediately write a new row into `/Users/walle/.openclaw/workspace/state/codex/OpenClaw_Codex_CLI_Session_Map.json`
+- start the new conversation with plain `codex exec`, not `--ephemeral`
+- capture the returned `session id` from CLI output as a provisional value
+- immediately confirm the real resumable id from the newly written local session file under `~/.codex/sessions/...jsonl`
+- treat `session_meta.payload.id` as the true session id for future resume operations
+- then write a new row into `/Users/walle/.openclaw/workspace/state/codex/OpenClaw_Codex_CLI_Session_Map.json`
 - do not depend on Codex internal `thread_name` generation for this path
 
-This is the primary flow. Scanning local session files is only a fallback when the CLI output did not expose the `session id`.
+CLI output alone is not the final source of truth. The real resumable id must be confirmed from the persisted session file. Do not use `--ephemeral` for sessions that are meant to be resumed later.
 
 ### Step 3: Continue the live Codex conversation
 
 For “继续沟通” tasks, use Codex CLI to send the user's message into the chosen `session_id` and wait for Codex's answer.
 Preferred pattern:
 - Resume an existing session with `codex exec resume <SESSION_ID> ...`
-- For a new session, create the session, capture `session id`, register it locally, then use that id for future continuation
+- For a new session, create it without `--ephemeral`, confirm the persisted `session_meta.payload.id`, register that id locally, then use that id for future continuation
 
 Return Codex's reply back to the user as Codex's answer.
 Make it clear only when helpful that this is Codex's response, but do not add your own interpretation unless the user asks.
@@ -150,6 +152,8 @@ Summarize the requested conversation faithfully and distinguish clearly between:
 - Treat OpenClaw-managed local files as the primary session-selection source.
 - Keep the VS Code index limited to `payload.source == "vscode"`.
 - Keep CLI-created sessions in the separate local map.
-- Prefer direct `session id` capture from Codex CLI output over filesystem rescans.
+- Prefer persisted session files under `~/.codex/sessions` as the resumable-id source of truth.
+- CLI output `session id` can be used as a provisional hint, but future resume operations should use the confirmed `session_meta.payload.id`.
+- Do not use `--ephemeral` when creating sessions that are expected to support later resume.
 - If a live Codex call fails, report the actual CLI error briefly and do not pretend the relay succeeded.
 - If a `session_id` disappears from Codex data later, keep the local row but degrade its display instead of hard-deleting it immediately.

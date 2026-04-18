@@ -123,10 +123,11 @@ If the user chooses `启用新会话`:
 
 1. Ask for the new session name
 2. Wait for confirmation
-3. Start a new Codex conversation
-4. Capture the returned `session id` directly from Codex CLI output
-5. Write a new row into `OpenClaw_Codex_CLI_Session_Map.json`
-6. Then continue relaying messages in that session
+3. Start a new Codex conversation with plain `codex exec`, not `--ephemeral`
+4. Capture the returned `session id` from CLI output as a provisional value
+5. Confirm the real resumable id from the newly written `~/.codex/sessions/...jsonl` file by reading the first `session_meta.payload.id`
+6. Write that confirmed id into `OpenClaw_Codex_CLI_Session_Map.json`
+7. Then continue relaying messages in that session
 
 Suggested prompt:
 
@@ -135,8 +136,9 @@ Suggested prompt:
 Do not finalize the title without user confirmation.
 
 Important rule:
-- direct CLI output `session id` capture is the primary registration path
-- filesystem scanning is fallback only when CLI output failed to expose the id
+- direct CLI output `session id` capture is only a provisional hint
+- the resumable session id must be confirmed from persisted local session files
+- do not use `--ephemeral` when the session is expected to support later resume
 
 ## CLI patterns
 
@@ -145,15 +147,17 @@ Important rule:
 Preferred pattern:
 
 ```bash
-printf '<USER_PROMPT>\n' | /Applications/Codex.app/Contents/Resources/codex exec resume <SESSION_ID> --skip-git-repo-check --ephemeral -o /tmp/codex-last-message.txt -
+printf '<USER_PROMPT>\n' | /Applications/Codex.app/Contents/Resources/codex exec resume <SESSION_ID> --skip-git-repo-check -o /tmp/codex-last-message.txt -
 ```
 
 ### Create a new session
 
-Use a non-interactive invocation that returns a new `session id`.
+Use a non-interactive plain `codex exec` invocation that returns a provisional `session id` and writes a local session file.
 Then:
-- extract `session id` from CLI output
-- append the local CLI map row immediately
+- extract the provisional `session id` from CLI output
+- inspect the newly created `~/.codex/sessions/...jsonl` file
+- read the first `session_meta.payload.id` and treat it as the true resumable id
+- append the local CLI map row with that confirmed id
 - store the confirmed user title in the local map
 
 ## Relay rules
@@ -180,8 +184,8 @@ Say plainly that the requested session name was not found, then offer the number
 
 ### CLI output missing session id
 
-Use fallback registration logic only then.
-Do not prefer filesystem scanning when the CLI already returned a usable id.
+Use persisted session-file lookup to recover the real id.
+Even when the CLI returns a usable-looking id, still confirm it from the local session file before relying on it for resume.
 
 ### Codex CLI command fails
 
